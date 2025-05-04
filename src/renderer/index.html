@@ -11,6 +11,8 @@
         --background-light: #f6f8fa;
         --text-color: #24292e;
         --text-secondary: #586069;
+        --resizer-color: #ddd; /* Added a color for the resizer */
+        --resizer-handle-color: #999; /* Color for the resizer handle */
       }
 
       body {
@@ -217,6 +219,9 @@
         color: var(--text-color);
         padding: 12px 16px;
         border-bottom: 1px solid var(--border-color);
+        /* Add right border to make column separation clearer */
+        border-right: 1px solid var(--border-color);
+        box-shadow: 1px 0 0 var(--border-color); /* Emphasize the th borders */
       }
 
       td {
@@ -239,16 +244,39 @@
         right: 0;
         top: 0;
         height: 100%;
-        width: 4px;
+        width: 5px; /* Reduced from 8px to 5px to make it thinner */
         cursor: col-resize;
         user-select: none;
         touch-action: none;
-        background: transparent;
+        background: var(--resizer-color); /* Default visible background */
         transition: background 0.2s ease;
+        /* Add distinct visual style to make it clearer */
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
-      .resizer:hover {
-        background: var(--primary-color);
+      .resizer:hover, .active-resizer {
+        background: rgba(0, 102, 204, 0.3);
+      }
+
+      /* Add a highlight effect to indicate the table header is resizable */
+      th:hover .resizer {
+        background: rgba(0, 102, 204, 0.3);
+      }
+
+      /* Style for the resizer handle */
+      .resizer-handle {
+        height: 20px;
+        width: 1px; /* Reduced from 2px to 1px to make it thinner */
+        background-color: var(--resizer-handle-color);
+        border-radius: 1px;
+      }
+
+      /* Add a visual indicator when resizing is active */
+      body.resizing-columns {
+        cursor: col-resize;
       }
 
       .cell-content {

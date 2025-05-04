@@ -14,10 +14,11 @@ function createWindow() {
   // Load the index.html file
   win.loadFile(path.join(__dirname, '../../dist/renderer/index.html'));
 
-  // Open DevTools in development
-  if (process.env.NODE_ENV === 'development') {
-    win.webContents.openDevTools();
-  }
+  // Developer tools will no longer automatically open
+  // Uncomment the following lines to re-enable dev tools in development mode
+  // if (process.env.NODE_ENV === 'development') {
+  //   win.webContents.openDevTools();
+  // }
 }
 
 app.whenReady().then(() => {

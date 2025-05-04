@@ -21,6 +21,7 @@ export const TableView: React.FC<TableViewProps> = ({
   findById
 }) => {
   const [currentResizer, setCurrentResizer] = useState<{ column: string; startX: number } | null>(null);
+  const [activeResizer, setActiveResizer] = useState<string | null>(null); // Track which resizer is hovered
   const tableRef = useRef<HTMLTableElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<{
@@ -99,10 +100,21 @@ export const TableView: React.FC<TableViewProps> = ({
         ...columnWidths,
         [currentResizer.column]: newWidth
       });
+      
+      // Update the current resizer position
+      setCurrentResizer({
+        column: currentResizer.column,
+        startX: e.clientX
+      });
+      
+      // Visual feedback during resize - add a class to the document body
+      document.body.classList.add('resizing-columns');
     };
 
     const handleMouseUp = () => {
       setCurrentResizer(null);
+      // Remove the resizing class
+      document.body.classList.remove('resizing-columns');
     };
 
     if (currentResizer) {
@@ -122,6 +134,14 @@ export const TableView: React.FC<TableViewProps> = ({
       column,
       startX: e.clientX
     });
+  };
+
+  const handleResizerMouseEnter = (column: string) => {
+    setActiveResizer(column);
+  };
+
+  const handleResizerMouseLeave = () => {
+    setActiveResizer(null);
   };
 
   const handleCellDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
@@ -209,21 +229,27 @@ export const TableView: React.FC<TableViewProps> = ({
               <th
                 key={col}
                 style={{ width: columnWidths[col] || 150 }}
+                title={`${col} - Click and drag the right edge to resize this column`}
               >
                 {col}
                 <div
                   role="button"
                   aria-orientation="vertical"
                   aria-label={`Resize ${col} column`}
-                  className="resizer"
+                  className={`resizer ${activeResizer === col ? 'active-resizer' : ''}`}
                   onMouseDown={(e) => handleResizerMouseDown(e, col)}
+                  onMouseEnter={() => handleResizerMouseEnter(col)}
+                  onMouseLeave={handleResizerMouseLeave}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       handleResizerMouseDown(e as unknown as React.MouseEvent, col);
                     }
                   }}
-                />
+                >
+                  {/* Add a visual handle indicator */}
+                  <div className="resizer-handle"></div>
+                </div>
               </th>
             ))}
           </tr>
