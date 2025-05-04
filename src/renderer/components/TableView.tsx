@@ -7,6 +7,8 @@ interface TableViewProps {
   setColumnWidths: (widths: { [key: string]: number }) => void;
   tabId: string;
   addFilter?: (column: string, value: string) => void;
+  tables?: string[]; // Add tables prop to show available tables in submenu
+  findById?: (tableName: string, idValue: string) => void; // Add function to open a new tab with ID filter
 }
 
 export const TableView: React.FC<TableViewProps> = ({
@@ -14,7 +16,9 @@ export const TableView: React.FC<TableViewProps> = ({
   columnWidths,
   setColumnWidths,
   tabId,
-  addFilter
+  addFilter,
+  tables = [], // Default to empty array
+  findById
 }) => {
   const [currentResizer, setCurrentResizer] = useState<{ column: string; startX: number } | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
@@ -24,6 +28,7 @@ export const TableView: React.FC<TableViewProps> = ({
     y: number;
     column: string;
     value: string;
+    showTablesSubmenu?: boolean; // Track whether to show tables submenu
   } | null>(null);
 
   const extractValue = (attr: any): string => {
@@ -44,7 +49,13 @@ export const TableView: React.FC<TableViewProps> = ({
   };
 
   useEffect(() => {
-    const handleClickOutside = () => {
+    const handleClickOutside = (e: MouseEvent) => {
+      // Don't close the menu if clicking on the submenu or the Find By ID button
+      if (e.target instanceof Element && 
+          (e.target.closest('.submenu') || 
+           e.target.closest('.find-by-id-btn'))) {
+        return;
+      }
       setContextMenu(null);
     };
 
@@ -52,7 +63,7 @@ export const TableView: React.FC<TableViewProps> = ({
     return () => {
       document.removeEventListener('click', handleClickOutside);
     };
-  }, []);
+  }, [contextMenu]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -126,13 +137,34 @@ export const TableView: React.FC<TableViewProps> = ({
       x: e.clientX,
       y: e.clientY,
       column,
-      value
+      value,
+      showTablesSubmenu: false
     });
   };
 
   const handleFilterClick = () => {
     if (contextMenu && addFilter) {
       addFilter(contextMenu.column, contextMenu.value);
+      setContextMenu(null);
+    }
+  };
+
+  const handleFindByIdClick = (e: React.MouseEvent) => {
+    // Prevent event propagation to avoid menu closing
+    e.stopPropagation();
+    
+    if (contextMenu) {
+      // Always show the submenu when Find By ID is clicked
+      setContextMenu({
+        ...contextMenu,
+        showTablesSubmenu: true
+      });
+    }
+  };
+
+  const handleTableSelect = (tableName: string) => {
+    if (contextMenu && findById) {
+      findById(tableName, contextMenu.value);
       setContextMenu(null);
     }
   };
@@ -206,6 +238,38 @@ export const TableView: React.FC<TableViewProps> = ({
           <button onClick={handleFilterClick}>
             Filter: {contextMenu.column} = {contextMenu.value}
           </button>
+          {findById && (
+            <button 
+              onClick={handleFindByIdClick}
+              className="find-by-id-btn" // Add class for click handler targeting
+            >
+              Find By ID
+            </button>
+          )}
+
+          {/* Tables submenu - improved styling and positioning */}
+          {contextMenu.showTablesSubmenu && tables.length > 0 && (
+            <div 
+              className="context-menu submenu"
+              style={{
+                position: 'absolute',
+                left: '100%',
+                top: '0',
+                zIndex: 1001,
+                minWidth: '150px',
+                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)'
+              }}
+            >
+              {tables.map(tableName => (
+                <button 
+                  key={tableName} 
+                  onClick={() => handleTableSelect(tableName)}
+                >
+                  {tableName}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

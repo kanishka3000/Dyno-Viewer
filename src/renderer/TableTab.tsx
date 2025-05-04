@@ -8,6 +8,8 @@ interface TableTabProps {
   tabId: string;
   tableName: string;
   onTableNameChange: (name: string) => void;
+  openNewTab?: (tableName: string, filters: FilterExpression[]) => void;
+  initialFilters?: FilterExpression[]; // Add initialFilters prop
 }
 
 interface TabState {
@@ -17,12 +19,19 @@ interface TabState {
   itemsPerPage: number;
 }
 
-export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNameChange }) => {
+export const TableTab: React.FC<TableTabProps> = ({ 
+  tabId, 
+  tableName, 
+  onTableNameChange, 
+  openNewTab,
+  initialFilters = [] // Default to empty array
+}) => {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [tables, setTables] = useState<string[]>([]);
   const [loadingTables, setLoadingTables] = useState(true);
-  const [filters, setFilters] = useState<FilterExpression[]>([]);
+  // Initialize filters with initialFilters if provided
+  const [filters, setFilters] = useState<FilterExpression[]>(initialFilters);
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({});
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
   const [lastEvaluatedKey, setLastEvaluatedKey] = useState<any>(undefined);
@@ -54,7 +63,8 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
       if (state.tableName) {
         onTableNameChange(state.tableName);
       }
-      if (state.filters) {
+      // Only load filters from local storage if no initialFilters were provided
+      if (state.filters && initialFilters.length === 0) {
         setFilters(state.filters);
       }
       if (state.columnWidths) {
@@ -64,7 +74,7 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
         setItemsPerPage(state.itemsPerPage);
       }
     }
-  }, [tabId]);
+  }, [tabId, initialFilters.length]);
 
   useEffect(() => {
     const state: TabState = {
@@ -94,6 +104,12 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
     fetchTables();
   }, []);
 
+  useEffect(() => {
+    if (tableName && initialFilters.length > 0) {
+      executeQuery();
+    }
+  }, [tableName, JSON.stringify(initialFilters)]);
+
   const executeQuery = async (startKey?: any, isNewQuery = true) => {
     if (!tableName) return;
 
@@ -107,7 +123,6 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
       setLastEvaluatedKey(results.lastEvaluatedKey);
       
       if (isNewQuery) {
-        // Reset pagination state for new queries
         setPageHistory([startKey]);
         setCurrentPageIndex(0);
       }
@@ -144,7 +159,6 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
     executeQuery();
   };
 
-  // Add this function to handle cell right-click filtering
   const handleAddFilter = (column: string, value: string) => {
     const newFilter: FilterExpression = {
       id: Date.now().toString(),
@@ -154,10 +168,19 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
     };
     
     setFilters([...filters, newFilter]);
-    
-    // Optionally execute the query immediately with the new filter
-    // Uncomment the next line if you want queries to execute automatically after adding a filter
-    // setTimeout(() => executeQuery(), 0);
+  };
+
+  const handleFindById = (selectedTableName: string, idValue: string) => {
+    if (!openNewTab) return;
+
+    const idFilter: FilterExpression = {
+      id: Date.now().toString(),
+      attributeName: 'id',
+      operator: '=',
+      value: idValue
+    };
+
+    openNewTab(selectedTableName, [idFilter]);
   };
 
   return (
@@ -184,6 +207,8 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
         setColumnWidths={setColumnWidths}
         tabId={tabId}
         addFilter={handleAddFilter}
+        tables={tables}
+        findById={handleFindById}
       />
     </div>
   );
