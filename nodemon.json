@@ -1,0 +1,7 @@
+{
+  "watch": ["src/"],
+  "ext": "ts,tsx,js,jsx,json,html",
+  "ignore": ["node_modules/**", "dist/**"],
+  "exec": "npm run build && npm run start",
+  "delay": "1000"
+}

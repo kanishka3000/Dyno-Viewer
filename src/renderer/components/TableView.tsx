@@ -1,25 +1,33 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { FilterExpression } from './FilterSection';
 
 interface TableViewProps {
   items: any[];
   columnWidths: { [key: string]: number };
   setColumnWidths: (widths: { [key: string]: number }) => void;
   tabId: string;
+  addFilter?: (column: string, value: string) => void;
 }
 
 export const TableView: React.FC<TableViewProps> = ({
   items,
   columnWidths,
   setColumnWidths,
-  tabId
+  tabId,
+  addFilter
 }) => {
   const [currentResizer, setCurrentResizer] = useState<{ column: string; startX: number } | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    column: string;
+    value: string;
+  } | null>(null);
 
-  // Helper function to extract value from DynamoDB attribute
   const extractValue = (attr: any): string => {
     if (!attr) return '';
-    // Handle different DynamoDB types
     if (attr.S !== undefined) return attr.S;
     if (attr.N !== undefined) return attr.N;
     if (attr.BOOL !== undefined) return attr.BOOL.toString();
@@ -34,6 +42,17 @@ export const TableView: React.FC<TableViewProps> = ({
     }
     return JSON.stringify(attr);
   };
+
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenu(null);
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -100,6 +119,24 @@ export const TableView: React.FC<TableViewProps> = ({
     }
   };
 
+  const handleCellContextMenu = (e: React.MouseEvent<HTMLElement>, column: string, value: string) => {
+    e.preventDefault();
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      column,
+      value
+    });
+  };
+
+  const handleFilterClick = () => {
+    if (contextMenu && addFilter) {
+      addFilter(contextMenu.column, contextMenu.value);
+      setContextMenu(null);
+    }
+  };
+
   if (items.length === 0) return null;
 
   const columns = Array.from(
@@ -137,20 +174,40 @@ export const TableView: React.FC<TableViewProps> = ({
         <tbody>
           {items.map((item, idx) => (
             <tr key={`${tabId}-${idx}-${Object.values(item).join('-')}`}>
-              {columns.map(col => (
-                <td
-                  key={col}
-                  onDoubleClick={handleCellDoubleClick}
-                  className="cell-content"
-                  style={{ width: columnWidths[col] || 150 }}
-                >
-                  {extractValue(item[col])}
-                </td>
-              ))}
+              {columns.map(col => {
+                const cellValue = extractValue(item[col]);
+                return (
+                  <td
+                    key={col}
+                    onDoubleClick={handleCellDoubleClick}
+                    onContextMenu={(e) => handleCellContextMenu(e, col, cellValue)}
+                    className="cell-content"
+                    style={{ width: columnWidths[col] || 150 }}
+                  >
+                    {cellValue}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
       </table>
+
+      {contextMenu && contextMenu.visible && (
+        <div 
+          className="context-menu"
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            zIndex: 1000
+          }}
+        >
+          <button onClick={handleFilterClick}>
+            Filter: {contextMenu.column} = {contextMenu.value}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

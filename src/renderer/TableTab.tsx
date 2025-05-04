@@ -144,6 +144,22 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
     executeQuery();
   };
 
+  // Add this function to handle cell right-click filtering
+  const handleAddFilter = (column: string, value: string) => {
+    const newFilter: FilterExpression = {
+      id: Date.now().toString(),
+      attributeName: column,
+      operator: '=',
+      value: value
+    };
+    
+    setFilters([...filters, newFilter]);
+    
+    // Optionally execute the query immediately with the new filter
+    // Uncomment the next line if you want queries to execute automatically after adding a filter
+    // setTimeout(() => executeQuery(), 0);
+  };
+
   return (
     <div>
       <FilterSection
@@ -167,6 +183,7 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
         columnWidths={columnWidths}
         setColumnWidths={setColumnWidths}
         tabId={tabId}
+        addFilter={handleAddFilter}
       />
     </div>
   );
