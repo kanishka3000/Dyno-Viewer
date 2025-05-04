@@ -17,14 +17,14 @@ export class AWSDynamoDBService implements DynamoDBService {
   }
 
   checkCredentials(): boolean {
-    const requiredEnvVars = {
-      'DDBV_KEY_ID': process.env.DDBV_KEY_ID,
-      'DDBV_ACC_KEY': process.env.DDBV_ACC_KEY,
-      'DDBV_STACK': process.env.DDBV_STACK
+    const requiredValues = {
+      'DDBV_KEY_ID': localStorage.getItem('DDBV_KEY_ID'),
+      'DDBV_ACC_KEY': localStorage.getItem('DDBV_ACC_KEY')
+      // Stack prefix is not required now
     };
 
-    return !Object.entries(requiredEnvVars)
-      .some(([_, value]) => !value);
+    return !Object.entries(requiredValues)
+      .some(([_, value]) => !value || value.trim() === '');
   }
 
   async listTables(): Promise<string[]> {
@@ -43,11 +43,14 @@ export class AWSDynamoDBService implements DynamoDBService {
       exclusiveStartTableName = response.LastEvaluatedTableName;
     } while (exclusiveStartTableName);
 
-    const prefix = process.env.DDBV_STACK ?? '';
+    const prefix = localStorage.getItem('DDBV_STACK') ?? '';
+    
+    // If prefix is empty, return all tables without filtering
     if (prefix === '') {
-      throw new Error('No prefix found in environment variables. Please set DDBV_STACK.');
+      return allTables.sort((a, b) => a.localeCompare(b));
     }
     
+    // Otherwise filter by prefix
     return allTables
       .filter(name => name.startsWith(prefix))
       .sort((a, b) => a.localeCompare(b)); // Sort tables alphabetically in ascending order

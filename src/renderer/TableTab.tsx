@@ -10,6 +10,7 @@ interface TableTabProps {
   onTableNameChange: (name: string) => void;
   openNewTab?: (tableName: string, filters: FilterExpression[]) => void;
   initialFilters?: FilterExpression[]; // Add initialFilters prop
+  hasSettings?: boolean; // Add hasSettings prop
 }
 
 interface TabState {
@@ -24,7 +25,8 @@ export const TableTab: React.FC<TableTabProps> = ({
   tableName, 
   onTableNameChange, 
   openNewTab,
-  initialFilters = [] // Default to empty array
+  initialFilters = [], // Default to empty array
+  hasSettings = false
 }) => {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,22 +40,18 @@ export const TableTab: React.FC<TableTabProps> = ({
   const [pageHistory, setPageHistory] = useState<any[]>([]);
   const [currentPageIndex, setCurrentPageIndex] = useState(-1);
 
+  // Create DynamoDB service using localStorage values instead of env vars
   const dynamoService: DynamoDBService = new AWSDynamoDBService({
     region: 'ap-southeast-2',
     credentials: {
-      accessKeyId: process.env.DDBV_KEY_ID ?? '',
-      secretAccessKey: process.env.DDBV_ACC_KEY ?? '',
+      accessKeyId: localStorage.getItem('DDBV_KEY_ID') || '',
+      secretAccessKey: localStorage.getItem('DDBV_ACC_KEY') || '',
     }
   });
 
   useEffect(() => {
-    if (!dynamoService.checkCredentials()) {
-      const missingVars = ['DDBV_KEY_ID', 'DDBV_ACC_KEY', 'DDBV_STACK']
-        .filter(key => !process.env[key])
-        .map(v => 'export ' + v + '=<value>')
-        .join('\n');
-      alert('The following environment variables need to be set:\n' + missingVars);
-    }
+    // We don't need to show an alert here anymore, as we'll show the settings dialog instead
+    // when hasSettings is false
   }, []);
 
   useEffect(() => {
@@ -87,31 +85,35 @@ export const TableTab: React.FC<TableTabProps> = ({
   }, [tabId, tableName, filters, columnWidths, itemsPerPage]);
 
   useEffect(() => {
-    const fetchTables = async () => {
-      try {
-        const tableList = await dynamoService.listTables();
-        setTables(tableList);
-        if (!tableName && tableList.length > 0) {
-          onTableNameChange(tableList[0]);
-        }
-      } catch (error) {
-        alert(`Error fetching tables: ${error instanceof Error ? error.message : String(error)}`);
-      } finally {
-        setLoadingTables(false);
-      }
-    };
+    // Only fetch tables if we have settings
+    if (hasSettings) {
+      fetchTables();
+    }
+  }, [hasSettings]);
 
-    fetchTables();
-  }, []);
+  const fetchTables = async () => {
+    try {
+      setLoadingTables(true);
+      const tableList = await dynamoService.listTables();
+      setTables(tableList);
+      if (!tableName && tableList.length > 0) {
+        onTableNameChange(tableList[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching tables:', error);
+    } finally {
+      setLoadingTables(false);
+    }
+  };
 
   useEffect(() => {
-    if (tableName && initialFilters.length > 0) {
+    if (tableName && initialFilters.length > 0 && hasSettings) {
       executeQuery();
     }
-  }, [tableName, JSON.stringify(initialFilters)]);
+  }, [tableName, JSON.stringify(initialFilters), hasSettings]);
 
   const executeQuery = async (startKey?: any, isNewQuery = true) => {
-    if (!tableName) return;
+    if (!tableName || !hasSettings) return;
 
     setLoading(true);
     try {
@@ -127,7 +129,7 @@ export const TableTab: React.FC<TableTabProps> = ({
         setCurrentPageIndex(0);
       }
     } catch (error) {
-      alert(`Error querying DynamoDB: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Error querying DynamoDB:', error);
     } finally {
       setLoading(false);
     }
