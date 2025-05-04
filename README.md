@@ -27,7 +27,7 @@ Add the following environment variables to your shell configuration (e.g., `.bas
 ```bash
 export DDBV_KEY_ID=<your-aws-key-id>
 export DDBV_ACC_KEY=<your-aws-access-key>
-export DDBV_STACK=<your-stack-name> eg es-d2
+export DDBV_STACK=<any initial table filtering> eg a cdk stack name
 ```
 
 
