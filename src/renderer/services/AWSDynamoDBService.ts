@@ -40,24 +40,13 @@ export class AWSDynamoDBService implements DynamoDBService {
   }
 
   async queryTable(tableName: string, filters: FilterExpression[], options: QueryOptions): Promise<PaginatedQueryResult> {
-    if (filters.length === 0) {
-      const command = new ScanCommand({
-        TableName: tableName,
-        Limit: options.limit,
-        ExclusiveStartKey: options.startKey
-      });
-
-      const response = await this.docClient.send(command);
-      return {
-        items: response.Items ?? [],
-        lastEvaluatedKey: response.LastEvaluatedKey
-      };
-    }
-
-    const keyConditions = this.buildKeyConditions(filters);
-    const command = new QueryCommand({
+    const { FilterExpression, ExpressionAttributeValues, ExpressionAttributeNames } = this.buildKeyConditions(filters);
+    
+    const command = new ScanCommand({
       TableName: tableName,
-      ...keyConditions,
+      FilterExpression,
+      ExpressionAttributeValues,
+      ExpressionAttributeNames,
       Limit: options.limit,
       ExclusiveStartKey: options.startKey
     });
@@ -72,18 +61,47 @@ export class AWSDynamoDBService implements DynamoDBService {
   private buildKeyConditions(filters: FilterExpression[]) {
     const filterParts: string[] = [];
     const expressionAttributeValues: { [key: string]: any } = {};
+    const expressionAttributeNames: { [key: string]: string } = {};
 
     filters.forEach((filter, index) => {
       if (filter.attributeName && filter.value) {
-        const placeholder = `:value${index}`;
-        filterParts.push(`${filter.attributeName} ${filter.operator} ${placeholder}`);
-        expressionAttributeValues[placeholder] = filter.value;
+        const valuePlaceholder = `:value${index}`;
+        const namePlaceholder = `#name${index}`;
+        
+        // Handle attribute names (using placeholders to avoid reserved words)
+        expressionAttributeNames[namePlaceholder] = filter.attributeName;
+
+        // Build the filter expression part
+        let filterPart: string;
+        if (filter.operator === 'begins_with') {
+          filterPart = `begins_with(${namePlaceholder}, ${valuePlaceholder})`;
+        } else {
+          filterPart = `${namePlaceholder} ${filter.operator} ${valuePlaceholder}`;
+        }
+        filterParts.push(filterPart);
+
+        // Handle the value based on its type
+        let attributeValue: any;
+        // Try to parse as number first
+        const numValue = Number(filter.value);
+        if (!isNaN(numValue) && filter.value.trim() !== '') {
+          attributeValue = { N: filter.value };
+        } else if (filter.value.toLowerCase() === 'true' || filter.value.toLowerCase() === 'false') {
+          attributeValue = { BOOL: filter.value.toLowerCase() === 'true' };
+        } else if (filter.value.toLowerCase() === 'null') {
+          attributeValue = { NULL: true };
+        } else {
+          attributeValue = { S: filter.value };
+        }
+        
+        expressionAttributeValues[valuePlaceholder] = attributeValue;
       }
     });
 
     return {
-      FilterExpression: filterParts.join(' AND '),
-      ExpressionAttributeValues: expressionAttributeValues
+      FilterExpression: filterParts.length > 0 ? filterParts.join(' AND ') : undefined,
+      ExpressionAttributeValues: Object.keys(expressionAttributeValues).length > 0 ? expressionAttributeValues : undefined,
+      ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined
     };
   }
 
