@@ -14,6 +14,7 @@ interface TabState {
   tableName: string;
   filters: FilterExpression[];
   columnWidths: { [key: string]: number };
+  itemsPerPage: number;
 }
 
 export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNameChange }) => {
@@ -23,8 +24,11 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
   const [loadingTables, setLoadingTables] = useState(true);
   const [filters, setFilters] = useState<FilterExpression[]>([]);
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({});
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10);
+  const [lastEvaluatedKey, setLastEvaluatedKey] = useState<any>(undefined);
+  const [pageHistory, setPageHistory] = useState<any[]>([]);
+  const [currentPageIndex, setCurrentPageIndex] = useState(-1);
 
-  // Initialize the DynamoDB service
   const dynamoService: DynamoDBService = new AWSDynamoDBService({
     region: 'ap-southeast-2',
     credentials: {
@@ -56,6 +60,9 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
       if (state.columnWidths) {
         setColumnWidths(state.columnWidths);
       }
+      if (state.itemsPerPage) {
+        setItemsPerPage(state.itemsPerPage);
+      }
     }
   }, [tabId]);
 
@@ -63,10 +70,11 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
     const state: TabState = {
       tableName,
       filters,
-      columnWidths
+      columnWidths,
+      itemsPerPage
     };
     localStorage.setItem(`tab-${tabId}`, JSON.stringify(state));
-  }, [tabId, tableName, filters, columnWidths]);
+  }, [tabId, tableName, filters, columnWidths, itemsPerPage]);
 
   useEffect(() => {
     const fetchTables = async () => {
@@ -86,13 +94,23 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
     fetchTables();
   }, []);
 
-  const executeQuery = async () => {
+  const executeQuery = async (startKey?: any, isNewQuery = true) => {
     if (!tableName) return;
 
     setLoading(true);
     try {
-      const results = await dynamoService.queryTable(tableName, filters);
-      setItems(results);
+      const results = await dynamoService.queryTable(tableName, filters, {
+        limit: itemsPerPage,
+        startKey
+      });
+      setItems(results.items);
+      setLastEvaluatedKey(results.lastEvaluatedKey);
+      
+      if (isNewQuery) {
+        // Reset pagination state for new queries
+        setPageHistory([startKey]);
+        setCurrentPageIndex(0);
+      }
     } catch (error) {
       alert(`Error querying DynamoDB: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -100,17 +118,49 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
     }
   };
 
+  const handleNextPage = () => {
+    if (lastEvaluatedKey) {
+      const newHistory = pageHistory.slice(0, currentPageIndex + 1);
+      newHistory.push(lastEvaluatedKey);
+      setPageHistory(newHistory);
+      setCurrentPageIndex(currentPageIndex + 1);
+      executeQuery(lastEvaluatedKey, false);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPageIndex > 0) {
+      const newIndex = currentPageIndex - 1;
+      setCurrentPageIndex(newIndex);
+      executeQuery(pageHistory[newIndex], false);
+    }
+  };
+
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value);
+    setLastEvaluatedKey(undefined);
+    setPageHistory([]);
+    setCurrentPageIndex(-1);
+    executeQuery();
+  };
+
   return (
     <div>
       <FilterSection
         filters={filters}
         setFilters={setFilters}
-        onExecuteQuery={executeQuery}
+        onExecuteQuery={() => executeQuery()}
         loading={loading}
         tableName={tableName}
         tables={tables}
         loadingTables={loadingTables}
         onTableNameChange={onTableNameChange}
+        itemsPerPage={itemsPerPage}
+        onItemsPerPageChange={handleItemsPerPageChange}
+        hasNextPage={!!lastEvaluatedKey}
+        hasPreviousPage={currentPageIndex > 0}
+        onNextPage={handleNextPage}
+        onPreviousPage={handlePreviousPage}
       />
       <TableView
         items={items}

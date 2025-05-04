@@ -1,6 +1,6 @@
-import { DynamoDBClient, ListTablesCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
-import { DynamoDBService, DynamoDBConfig } from './DynamoDBService';
+import { DynamoDBClient, ListTablesCommand, QueryCommand, ScanCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBService, DynamoDBConfig, PaginatedQueryResult, QueryOptions } from './DynamoDBService';
 import { FilterExpression } from '../components/FilterSection';
 
 export class AWSDynamoDBService implements DynamoDBService {
@@ -39,37 +39,55 @@ export class AWSDynamoDBService implements DynamoDBService {
     return response.TableNames.filter(name => name.startsWith(prefix));
   }
 
-  async queryTable(tableName: string, filters: FilterExpression[]): Promise<any[]> {
-    if (!tableName) return [];
-
-    if (filters.length > 0) {
-      const filterParts: string[] = [];
-      const expressionAttributeValues: { [key: string]: any } = {};
-
-      filters.forEach((filter, index) => {
-        if (filter.attributeName && filter.value) {
-          const placeholder = `:value${index}`;
-          filterParts.push(`${filter.attributeName} ${filter.operator} ${placeholder}`);
-          expressionAttributeValues[placeholder] = filter.value;
-        }
+  async queryTable(tableName: string, filters: FilterExpression[], options: QueryOptions): Promise<PaginatedQueryResult> {
+    if (filters.length === 0) {
+      const command = new ScanCommand({
+        TableName: tableName,
+        Limit: options.limit,
+        ExclusiveStartKey: options.startKey
       });
 
-      if (filterParts.length > 0) {
-        const command = new ScanCommand({
-          TableName: tableName,
-          FilterExpression: filterParts.join(' AND '),
-          ExpressionAttributeValues: expressionAttributeValues
-        });
-        const response = await this.docClient.send(command);
-        return response.Items ?? [];
-      }
+      const response = await this.docClient.send(command);
+      return {
+        items: response.Items ?? [],
+        lastEvaluatedKey: response.LastEvaluatedKey
+      };
     }
 
-    const command = new ScanCommand({
+    const keyConditions = this.buildKeyConditions(filters);
+    const command = new QueryCommand({
       TableName: tableName,
-      Limit: 20
+      ...keyConditions,
+      Limit: options.limit,
+      ExclusiveStartKey: options.startKey
     });
+
     const response = await this.docClient.send(command);
-    return response.Items ?? [];
+    return {
+      items: response.Items ?? [],
+      lastEvaluatedKey: response.LastEvaluatedKey
+    };
+  }
+
+  private buildKeyConditions(filters: FilterExpression[]) {
+    const filterParts: string[] = [];
+    const expressionAttributeValues: { [key: string]: any } = {};
+
+    filters.forEach((filter, index) => {
+      if (filter.attributeName && filter.value) {
+        const placeholder = `:value${index}`;
+        filterParts.push(`${filter.attributeName} ${filter.operator} ${placeholder}`);
+        expressionAttributeValues[placeholder] = filter.value;
+      }
+    });
+
+    return {
+      FilterExpression: filterParts.join(' AND '),
+      ExpressionAttributeValues: expressionAttributeValues
+    };
+  }
+
+  private unmarshallItem(item: any) {
+    return item; // Assuming no special unmarshalling is needed
   }
 }

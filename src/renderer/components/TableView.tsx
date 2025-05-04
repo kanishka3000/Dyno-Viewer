@@ -16,6 +16,25 @@ export const TableView: React.FC<TableViewProps> = ({
   const [currentResizer, setCurrentResizer] = useState<{ column: string; startX: number } | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
 
+  // Helper function to extract value from DynamoDB attribute
+  const extractValue = (attr: any): string => {
+    if (!attr) return '';
+    // Handle different DynamoDB types
+    if (attr.S !== undefined) return attr.S;
+    if (attr.N !== undefined) return attr.N;
+    if (attr.BOOL !== undefined) return attr.BOOL.toString();
+    if (attr.NULL !== undefined) return 'null';
+    if (attr.L !== undefined) return JSON.stringify(attr.L.map(extractValue));
+    if (attr.M !== undefined) {
+      const obj = Object.entries(attr.M).reduce((acc: any, [key, value]) => {
+        acc[key] = extractValue(value);
+        return acc;
+      }, {});
+      return JSON.stringify(obj);
+    }
+    return JSON.stringify(attr);
+  };
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!currentResizer) return;
@@ -88,48 +107,50 @@ export const TableView: React.FC<TableViewProps> = ({
   );
 
   return (
-    <table ref={tableRef}>
-      <thead>
-        <tr>
-          {columns.map(col => (
-            <th
-              key={col}
-              style={{ width: columnWidths[col] || 150 }}
-            >
-              {col}
-              <div
-                role="button"
-                aria-orientation="vertical"
-                aria-label={`Resize ${col} column`}
-                className="resizer"
-                onMouseDown={(e) => handleResizerMouseDown(e, col)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleResizerMouseDown(e as unknown as React.MouseEvent, col);
-                  }
-                }}
-              />
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item, idx) => (
-          <tr key={`${tabId}-${idx}-${Object.values(item).join('-')}`}>
+    <div className="table-container">
+      <table ref={tableRef}>
+        <thead>
+          <tr>
             {columns.map(col => (
-              <td
+              <th
                 key={col}
-                onDoubleClick={handleCellDoubleClick}
-                className="cell-content"
                 style={{ width: columnWidths[col] || 150 }}
               >
-                {JSON.stringify(item[col] ?? '')}
-              </td>
+                {col}
+                <div
+                  role="button"
+                  aria-orientation="vertical"
+                  aria-label={`Resize ${col} column`}
+                  className="resizer"
+                  onMouseDown={(e) => handleResizerMouseDown(e, col)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleResizerMouseDown(e as unknown as React.MouseEvent, col);
+                    }
+                  }}
+                />
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {items.map((item, idx) => (
+            <tr key={`${tabId}-${idx}-${Object.values(item).join('-')}`}>
+              {columns.map(col => (
+                <td
+                  key={col}
+                  onDoubleClick={handleCellDoubleClick}
+                  className="cell-content"
+                  style={{ width: columnWidths[col] || 150 }}
+                >
+                  {extractValue(item[col])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 };

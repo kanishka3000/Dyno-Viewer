@@ -16,6 +16,12 @@ interface FilterSectionProps {
   tables: string[];
   loadingTables: boolean;
   onTableNameChange: (name: string) => void;
+  itemsPerPage: number;
+  onItemsPerPageChange: (value: number) => void;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  onNextPage: () => void;
+  onPreviousPage: () => void;
 }
 
 export const FilterSection: React.FC<FilterSectionProps> = ({
@@ -27,6 +33,12 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
   tables,
   loadingTables,
   onTableNameChange,
+  itemsPerPage,
+  onItemsPerPageChange,
+  hasNextPage,
+  hasPreviousPage,
+  onNextPage,
+  onPreviousPage
 }) => {
   const addFilter = () => {
     setFilters([
@@ -102,13 +114,34 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
             </button>
           </div>
         ))}
+      </div>
 
-        <div className="actions-row">
+      <div className="actions-row">
+        <button
+          onClick={addFilter}
+          className="secondary"
+        >
+          Add Filter
+        </button>
+        <div className="items-per-page">
+          <label htmlFor="itemsPerPage">Items per page:</label>
+          <select
+            id="itemsPerPage"
+            value={itemsPerPage}
+            onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
+          >
+            <option value="10">10</option>
+            <option value="30">30</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+        <div className="pagination-controls">
           <button
-            onClick={addFilter}
+            onClick={onPreviousPage}
+            disabled={!hasPreviousPage || loading}
             className="secondary"
           >
-            Add Filter
+            Previous
           </button>
           <button
             onClick={onExecuteQuery}
@@ -116,6 +149,13 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
             className="primary"
           >
             {loading ? 'Loading...' : 'Query'}
+          </button>
+          <button
+            onClick={onNextPage}
+            disabled={!hasNextPage || loading}
+            className="secondary"
+          >
+            Next
           </button>
         </div>
       </div>
