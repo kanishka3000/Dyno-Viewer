@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { DynamoDBClient, ListTablesCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { FilterSection, type FilterExpression } from './components/FilterSection';
 import { TableView } from './components/TableView';
+import { AWSDynamoDBService } from './services/AWSDynamoDBService';
+import type { DynamoDBService } from './services/DynamoDBService';
 
 interface TableTabProps {
   tabId: string;
@@ -24,43 +24,23 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
   const [filters, setFilters] = useState<FilterExpression[]>([]);
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({});
 
-  const clientConfig = {
+  // Initialize the DynamoDB service
+  const dynamoService: DynamoDBService = new AWSDynamoDBService({
     region: 'ap-southeast-2',
     credentials: {
       accessKeyId: process.env.DDBV_KEY_ID ?? '',
       secretAccessKey: process.env.DDBV_ACC_KEY ?? '',
     }
-  };
-
-  const client = new DynamoDBClient(clientConfig);
-  const docClient = DynamoDBDocumentClient.from(client, {
-    marshallOptions: {
-      removeUndefinedValues: true,
-    }
   });
 
-  const checkRequiredEnvVars = () => {
-    const requiredEnvVars = {
-      'DDBV_KEY_ID': process.env.DDBV_KEY_ID,
-      'DDBV_ACC_KEY': process.env.DDBV_ACC_KEY,
-      'DDBV_STACK': process.env.DDBV_STACK
-    };
-
-    const missingVars = Object.entries(requiredEnvVars)
-      .filter(([_, value]) => !value)
-      .map(([key]) => key);
-
-    if (missingVars.length > 0) {
-      const envVarsList = missingVars.map(v => 'export ' + v + '=<value>').join('\n');
-      const message = 'The following environment variables need to be set:\n' + envVarsList;
-      alert(message);
-      return false;
-    }
-    return true;
-  };
-
   useEffect(() => {
-    checkRequiredEnvVars();
+    if (!dynamoService.checkCredentials()) {
+      const missingVars = ['DDBV_KEY_ID', 'DDBV_ACC_KEY', 'DDBV_STACK']
+        .filter(key => !process.env[key])
+        .map(v => 'export ' + v + '=<value>')
+        .join('\n');
+      alert('The following environment variables need to be set:\n' + missingVars);
+    }
   }, []);
 
   useEffect(() => {
@@ -91,19 +71,10 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
   useEffect(() => {
     const fetchTables = async () => {
       try {
-        const command = new ListTablesCommand({});
-        const response = await client.send(command);
-        if (response.TableNames) {
-          const prefix = process.env.DDBV_STACK ?? '';
-          if (prefix === '') {
-            alert('No prefix found in environment variables. Please set DDBV_STACK.');
-            return;
-          }
-          const filteredTables = response.TableNames.filter(name => name.startsWith(prefix));
-          setTables(filteredTables);
-          if (!tableName && response.TableNames.length > 0) {
-            onTableNameChange(response.TableNames[0]);
-          }
+        const tableList = await dynamoService.listTables();
+        setTables(tableList);
+        if (!tableName && tableList.length > 0) {
+          onTableNameChange(tableList[0]);
         }
       } catch (error) {
         alert(`Error fetching tables: ${error instanceof Error ? error.message : String(error)}`);
@@ -120,35 +91,8 @@ export const TableTab: React.FC<TableTabProps> = ({ tabId, tableName, onTableNam
 
     setLoading(true);
     try {
-      if (filters.length > 0) {
-        const filterParts: string[] = [];
-        const expressionAttributeValues: { [key: string]: any } = {};
-
-        filters.forEach((filter, index) => {
-          if (filter.attributeName && filter.value) {
-            const placeholder = `:value${index}`;
-            filterParts.push(`${filter.attributeName} ${filter.operator} ${placeholder}`);
-            expressionAttributeValues[placeholder] = filter.value;
-          }
-        });
-
-        if (filterParts.length > 0) {
-          const command = new ScanCommand({
-            TableName: tableName,
-            FilterExpression: filterParts.join(' AND '),
-            ExpressionAttributeValues: expressionAttributeValues
-          });
-          const response = await docClient.send(command);
-          setItems(response.Items ?? []);
-        }
-      } else {
-        const command = new ScanCommand({
-          TableName: tableName,
-          Limit: 20
-        });
-        const response = await docClient.send(command);
-        setItems(response.Items ?? []);
-      }
+      const results = await dynamoService.queryTable(tableName, filters);
+      setItems(results);
     } catch (error) {
       alert(`Error querying DynamoDB: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
