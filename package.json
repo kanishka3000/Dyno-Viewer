@@ -10,7 +10,9 @@
     "dev": "npm run build && npm run start",
     "start:dev": "nodemon --watch src --ext ts,tsx,js,jsx,json --exec \"npm run build && npm run start\"",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win"
   },
   "keywords": [],
   "author": "",
@@ -44,6 +46,17 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
     }
   }
 }
