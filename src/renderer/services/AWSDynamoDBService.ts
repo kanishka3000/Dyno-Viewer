@@ -1,4 +1,4 @@
-import { DynamoDBClient, ListTablesCommand, QueryCommand, ScanCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, ListTablesCommand, ScanCommand, ListTablesCommandOutput } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { DynamoDBService, DynamoDBConfig, PaginatedQueryResult, QueryOptions } from './DynamoDBService';
 import { FilterExpression } from '../components/FilterSection';
@@ -28,15 +28,27 @@ export class AWSDynamoDBService implements DynamoDBService {
   }
 
   async listTables(): Promise<string[]> {
-    const command = new ListTablesCommand({});
-    const response = await this.client.send(command);
-    if (!response.TableNames) return [];
+    let allTables: string[] = [];
+    let exclusiveStartTableName: string | undefined = undefined;
+    
+    do {
+      const command: ListTablesCommand = new ListTablesCommand({
+        ExclusiveStartTableName: exclusiveStartTableName
+      });
+      
+      const response: ListTablesCommandOutput = await this.client.send(command);
+      if (!response.TableNames) break;
+      
+      allTables = [...allTables, ...response.TableNames];
+      exclusiveStartTableName = response.LastEvaluatedTableName;
+    } while (exclusiveStartTableName);
 
     const prefix = process.env.DDBV_STACK ?? '';
     if (prefix === '') {
       throw new Error('No prefix found in environment variables. Please set DDBV_STACK.');
     }
-    return response.TableNames.filter(name => name.startsWith(prefix));
+    
+    return allTables.filter(name => name.startsWith(prefix));
   }
 
   async queryTable(tableName: string, filters: FilterExpression[], options: QueryOptions): Promise<PaginatedQueryResult> {
