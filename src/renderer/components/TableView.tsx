@@ -22,6 +22,7 @@ export const TableView: React.FC<TableViewProps> = ({
 }) => {
   const [currentResizer, setCurrentResizer] = useState<{ column: string; startX: number } | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
     x: number;
@@ -46,6 +47,27 @@ export const TableView: React.FC<TableViewProps> = ({
       return JSON.stringify(obj);
     }
     return JSON.stringify(attr);
+  };
+
+  // Calculate optimal position for submenu
+  const calculateSubmenuPosition = () => {
+    if (!submenuRef.current || !contextMenu) return { left: '100%', right: 'auto' };
+
+    const contextMenuRect = submenuRef.current.parentElement?.getBoundingClientRect();
+    if (!contextMenuRect) return { left: '100%', right: 'auto' };
+
+    // Check if there's enough space on the right
+    const viewportWidth = window.innerWidth;
+    const submenuWidth = 200; // Estimated width, can be adjusted
+    
+    // If there's enough space on the right
+    if (contextMenuRect.right + submenuWidth < viewportWidth - 20) {
+      return { left: '100%', right: 'auto' };
+    } 
+    // Otherwise position to the left
+    else {
+      return { left: 'auto', right: '100%' };
+    }
   };
 
   useEffect(() => {
@@ -175,6 +197,9 @@ export const TableView: React.FC<TableViewProps> = ({
     new Set(items.flatMap(item => Object.keys(item)))
   );
 
+  // Get submenu position (left or right)
+  const submenuPosition = calculateSubmenuPosition();
+
   return (
     <div className="table-container">
       <table ref={tableRef}>
@@ -247,16 +272,20 @@ export const TableView: React.FC<TableViewProps> = ({
             </button>
           )}
 
-          {/* Tables submenu - improved styling and positioning */}
+          {/* Tables submenu - improved positioning and scrolling */}
           {contextMenu.showTablesSubmenu && tables.length > 0 && (
             <div 
+              ref={submenuRef}
               className="context-menu submenu"
               style={{
                 position: 'absolute',
-                left: '100%',
                 top: '0',
+                left: submenuPosition.left,
+                right: submenuPosition.right,
                 zIndex: 1001,
-                minWidth: '150px',
+                maxHeight: '300px', // Limit height and add scrolling
+                overflowY: 'auto', // Enable vertical scrolling
+                minWidth: '200px',
                 boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)'
               }}
             >
@@ -264,6 +293,14 @@ export const TableView: React.FC<TableViewProps> = ({
                 <button 
                   key={tableName} 
                   onClick={() => handleTableSelect(tableName)}
+                  style={{
+                    padding: '8px 16px',
+                    textAlign: 'left',
+                    width: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
                 >
                   {tableName}
                 </button>

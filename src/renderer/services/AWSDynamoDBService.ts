@@ -48,7 +48,9 @@ export class AWSDynamoDBService implements DynamoDBService {
       throw new Error('No prefix found in environment variables. Please set DDBV_STACK.');
     }
     
-    return allTables.filter(name => name.startsWith(prefix));
+    return allTables
+      .filter(name => name.startsWith(prefix))
+      .sort((a, b) => a.localeCompare(b)); // Sort tables alphabetically in ascending order
   }
 
   async queryTable(tableName: string, filters: FilterExpression[], options: QueryOptions): Promise<PaginatedQueryResult> {
