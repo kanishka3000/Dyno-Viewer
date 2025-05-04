@@ -16,6 +16,10 @@ on:
         required: true
         default: false
 
+# Add permissions needed for release creation
+permissions:
+  contents: write
+
 jobs:
   release:
     name: Create Release
