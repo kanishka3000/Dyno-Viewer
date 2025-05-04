@@ -20,15 +20,6 @@ cd dyno-view
 npm install
 ```
 
-3. Set up environment variables
-
-Add the following environment variables to your shell configuration (e.g., `.bashrc`, `.zshrc`):
-
-```bash
-export DDBV_KEY_ID=<your-aws-key-id>
-export DDBV_ACC_KEY=<your-aws-access-key>
-export DDBV_STACK=<any initial table filtering> eg a cdk stack name
-```
 
 
 ## Development
@@ -45,6 +36,40 @@ To build the application:
 
 ```bash
 npm run build
+```
+
+## Building Binaries
+
+### Building for macOS
+
+To build a macOS binary (.dmg and .zip):
+
+```bash
+npm run dist:mac
+```
+
+This will create:
+- A `.dmg` installer file in the `release` directory
+- A `.zip` archive in the `release` directory
+
+### Building for Windows
+
+To build Windows binaries:
+
+```bash
+npm run dist:win
+```
+
+This will create:
+- A portable `.exe` file in the `release` directory
+- An installable setup `.exe` file in the `release` directory
+
+### Building for All Platforms
+
+To build for all configured platforms:
+
+```bash
+npm run dist
 ```
 
 ## Project Structure
