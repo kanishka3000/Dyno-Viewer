@@ -7,7 +7,9 @@
     "start": "electron .",
     "build": "tsc && webpack --config webpack.config.js && copyfiles -u 2 \"src/renderer/*.html\" dist/renderer",
     "watch": "tsc -w",
-    "dev": "npm run build && npm run start"
+    "dev": "npm run build && npm run start",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +17,7 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.0.0",
     "@aws-sdk/lib-dynamodb": "^3.0.0",
-    "electron": "^28.0.0",
+   
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -23,9 +25,24 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "copyfiles": "^2.4.1",
+    "electron-builder": "^26.0.12",
     "ts-loader": "^9.5.2",
     "typescript": "^5.0.0",
     "webpack": "^5.99.7",
-    "webpack-cli": "^5.1.4"
+    "webpack-cli": "^5.1.4",
+     "electron": "^28.0.0"
+  },
+  "build": {
+    "appId": "com.dyno-view.app",
+    "productName": "DynoView",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools"
+    }
   }
 }
