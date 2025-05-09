@@ -22,6 +22,8 @@ interface FilterSectionProps {
   hasPreviousPage: boolean;
   onNextPage: () => void;
   onPreviousPage: () => void;
+  sampleItemProperties?: string[];
+  loadingProperties?: boolean;
 }
 
 export const FilterSection: React.FC<FilterSectionProps> = ({
@@ -38,7 +40,9 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
   hasNextPage,
   hasPreviousPage,
   onNextPage,
-  onPreviousPage
+  onPreviousPage,
+  sampleItemProperties = [],
+  loadingProperties = false
 }) => {
   const addFilter = () => {
     setFilters([
@@ -82,12 +86,29 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
       <div className="filters-section">
         {filters.map((filter) => (
           <div key={filter.id} className="filter-row">
-            <input
-              type="text"
-              placeholder="Attribute name"
-              value={filter.attributeName}
-              onChange={(e) => updateFilter(filter.id, { attributeName: e.target.value })}
-            />
+            <div className="attribute-field">
+              {loadingProperties ? (
+                <select disabled>
+                  <option>Loading properties...</option>
+                </select>
+              ) : (
+                <div className="combobox-wrapper">
+                  <input
+                    list={`properties-list-${filter.id}`}
+                    type="text"
+                    placeholder="Attribute name"
+                    value={filter.attributeName}
+                    onChange={(e) => updateFilter(filter.id, { attributeName: e.target.value })}
+                  />
+                  <datalist id={`properties-list-${filter.id}`}>
+                    {sampleItemProperties.map((prop) => (
+                      <option key={prop} value={prop} />
+                    ))}
+                  </datalist>
+                </div>
+              )}
+            </div>
+
             <select
               value={filter.operator}
               onChange={(e) => updateFilter(filter.id, { operator: e.target.value })}

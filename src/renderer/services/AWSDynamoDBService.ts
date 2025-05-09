@@ -56,6 +56,26 @@ export class AWSDynamoDBService implements DynamoDBService {
       .sort((a, b) => a.localeCompare(b)); // Sort tables alphabetically in ascending order
   }
 
+  async fetchSampleItem(tableName: string): Promise<any | null> {
+    try {
+      // Query just one item to use as a sample for property names
+      const command = new ScanCommand({
+        TableName: tableName,
+        Limit: 1 // Just get 1 item
+      });
+
+      const response = await this.docClient.send(command);
+      
+      if (response.Items && response.Items.length > 0) {
+        return response.Items[0];
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching sample item:', error);
+      return null;
+    }
+  }
+
   async queryTable(tableName: string, filters: FilterExpression[], options: QueryOptions): Promise<PaginatedQueryResult> {
     const { FilterExpression, ExpressionAttributeValues, ExpressionAttributeNames } = this.buildKeyConditions(filters);
     

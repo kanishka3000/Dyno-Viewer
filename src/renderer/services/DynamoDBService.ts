@@ -13,6 +13,7 @@ export interface QueryOptions {
 export interface DynamoDBService {
   listTables(): Promise<string[]>;
   queryTable(tableName: string, filters: FilterExpression[], options: QueryOptions): Promise<PaginatedQueryResult>;
+  fetchSampleItem(tableName: string): Promise<any | null>; // New method to fetch a sample item
   checkCredentials(): boolean;
 }
 

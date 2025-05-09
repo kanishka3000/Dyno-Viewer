@@ -39,6 +39,9 @@ export const TableTab: React.FC<TableTabProps> = ({
   const [lastEvaluatedKey, setLastEvaluatedKey] = useState<any>(undefined);
   const [pageHistory, setPageHistory] = useState<any[]>([]);
   const [currentPageIndex, setCurrentPageIndex] = useState(-1);
+  // Add state for sample item properties
+  const [sampleItemProperties, setSampleItemProperties] = useState<string[]>([]);
+  const [loadingProperties, setLoadingProperties] = useState(false);
 
   // Create DynamoDB service using localStorage values instead of env vars
   const dynamoService: DynamoDBService = new AWSDynamoDBService({
@@ -90,6 +93,38 @@ export const TableTab: React.FC<TableTabProps> = ({
       fetchTables();
     }
   }, [hasSettings]);
+
+  useEffect(() => {
+    // Fetch a sample item when the table changes
+    if (tableName && hasSettings) {
+      fetchSampleItem();
+    } else {
+      // Reset properties if no table is selected
+      setSampleItemProperties([]);
+    }
+  }, [tableName, hasSettings]);
+
+  const fetchSampleItem = async () => {
+    if (!tableName) return;
+    
+    setLoadingProperties(true);
+    try {
+      const sampleItem = await dynamoService.fetchSampleItem(tableName);
+      
+      if (sampleItem) {
+        // Extract property names from the sample item
+        const properties = Object.keys(sampleItem);
+        setSampleItemProperties(properties);
+      } else {
+        setSampleItemProperties([]);
+      }
+    } catch (error) {
+      console.error('Error fetching sample item:', error);
+      setSampleItemProperties([]);
+    } finally {
+      setLoadingProperties(false);
+    }
+  };
 
   const fetchTables = async () => {
     try {
@@ -195,13 +230,21 @@ export const TableTab: React.FC<TableTabProps> = ({
         tableName={tableName}
         tables={tables}
         loadingTables={loadingTables}
-        onTableNameChange={onTableNameChange}
+        onTableNameChange={(name) => {
+          onTableNameChange(name);
+          // Reset the lastEvaluatedKey when changing tables
+          setLastEvaluatedKey(undefined);
+          setPageHistory([]);
+          setCurrentPageIndex(-1);
+        }}
         itemsPerPage={itemsPerPage}
         onItemsPerPageChange={handleItemsPerPageChange}
         hasNextPage={!!lastEvaluatedKey}
         hasPreviousPage={currentPageIndex > 0}
         onNextPage={handleNextPage}
         onPreviousPage={handlePreviousPage}
+        sampleItemProperties={sampleItemProperties}
+        loadingProperties={loadingProperties}
       />
       <TableView
         items={items}

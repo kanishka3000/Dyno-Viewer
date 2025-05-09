@@ -164,6 +164,34 @@
         justify-content: center;
       }
 
+      /* Combobox styles */
+      .attribute-field {
+        flex: 1;
+        position: relative;
+      }
+
+      .combobox-wrapper {
+        position: relative;
+        display: flex;
+      }
+
+      .combobox-wrapper input {
+        position: relative;
+        width: 100%;
+        padding-right: 30px; /* Make space for dropdown indicator */
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>');
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        background-size: 16px;
+      }
+
+      /* Style for loading state */
+      .attribute-field select[disabled] {
+        background-color: var(--background-light);
+        color: var(--text-secondary);
+        cursor: not-allowed;
+      }
+
       /* Buttons */
       button {
         padding: 8px 16px;
