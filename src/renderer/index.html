@@ -523,6 +523,178 @@
         background-color: #6c757d;
         color: white;
       }
+
+      /* Operation selection styles */
+      .operation-selection {
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+      }
+
+      .operation-selection label {
+        margin-right: 10px;
+        font-weight: 500;
+      }
+
+      /* Toggle switch styles */
+      .toggle-switch-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 120px;
+        height: 34px;
+      }
+
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--background-light);
+        border: 1px solid var(--border-color);
+        transition: 0.4s;
+        border-radius: 34px;
+      }
+
+      /* Clear filters button style */
+      .clear-filters-btn {
+        margin-left: auto;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .clear-filters-btn:hover {
+        color: var(--text-color);
+      }
+
+      .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 56px;
+        left: 4px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 34px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .toggle-labels {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 10px;
+        pointer-events: none;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .toggle-labels .scan {
+        margin-left: 4px;
+        color: var(--primary-color);
+      }
+
+      .toggle-labels .query {
+        margin-right: 8px;
+        color: var(--text-secondary);
+      }
+
+      input:checked + .toggle-slider:before {
+        transform: translateX(56px);
+      }
+
+      input:checked + .toggle-slider + .toggle-labels .scan {
+        color: var(--text-secondary);
+      }
+
+      input:checked + .toggle-slider + .toggle-labels .query {
+        color: var(--primary-color);
+      }
+
+      /* Operation type select - hiding the original dropdown */
+      .operation-type-select {
+        min-width: 120px;
+        padding: 6px 10px;
+      }
+
+      /* Query controls styles */
+      .query-controls {
+        background-color: #f9f9f9;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 16px;
+      }
+
+      .index-selection {
+        margin-bottom: 12px;
+      }
+
+      .key-input {
+        margin-bottom: 12px;
+      }
+
+      .sort-key-controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .sort-key-operator {
+        width: 120px;
+      }
+
+      /* Filter hint style */
+      .filter-hint {
+        font-size: 12px;
+        color: #888;
+        margin-left: 8px;
+        font-weight: normal;
+      }
+
+      /* Responsive adjustments */
+      @media (max-width: 768px) {
+        .filter-row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        
+        .filter-row > * {
+          width: 100%;
+          margin-bottom: 8px;
+        }
+        
+        .actions-row {
+          flex-direction: column;
+          gap: 10px;
+        }
+        
+        .pagination-controls {
+          width: 100%;
+          justify-content: space-between;
+        }
+      }
     </style>
   </head>
   <body>

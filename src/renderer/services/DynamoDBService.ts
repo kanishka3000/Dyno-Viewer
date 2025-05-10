@@ -10,11 +10,37 @@ export interface QueryOptions {
   startKey?: any;
 }
 
+// Interface for table/index key schema information
+export interface KeySchemaInfo {
+  tableName: string;
+  keySchema: {
+    partitionKey: string;
+    sortKey?: string;
+  };
+  indexes?: {
+    [indexName: string]: {
+      partitionKey: string;
+      sortKey?: string;
+    }
+  };
+}
+
 export interface DynamoDBService {
   listTables(): Promise<string[]>;
-  queryTable(tableName: string, filters: FilterExpression[], options: QueryOptions): Promise<PaginatedQueryResult>;
-  fetchSampleItem(tableName: string): Promise<any | null>; // New method to fetch a sample item
+  scanTable(tableName: string, filters: FilterExpression[], options: QueryOptions): Promise<PaginatedQueryResult>;
+  fetchSampleItem(tableName: string): Promise<any | null>;
   checkCredentials(): boolean;
+  
+  // New methods for querying
+  getTableKeySchema(tableName: string): Promise<KeySchemaInfo | null>;
+  queryTable(
+    tableName: string, 
+    indexName: string | null, 
+    partitionKey: { name: string; value: string },
+    sortKey: { name: string; value: string; operator: string } | null,
+    filters: FilterExpression[], 
+    options: QueryOptions
+  ): Promise<PaginatedQueryResult>;
 }
 
 export interface DynamoDBConfig {

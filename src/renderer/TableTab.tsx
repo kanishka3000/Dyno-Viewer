@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FilterSection, type FilterExpression } from './components/FilterSection';
 import { TableView } from './components/TableView';
 import { AWSDynamoDBService } from './services/AWSDynamoDBService';
-import type { DynamoDBService } from './services/DynamoDBService';
+import type { DynamoDBService, KeySchemaInfo } from './services/DynamoDBService';
 
 interface TableTabProps {
   tabId: string;
@@ -18,6 +18,11 @@ interface TabState {
   filters: FilterExpression[];
   columnWidths: { [key: string]: number };
   itemsPerPage: number;
+  operationType: 'scan' | 'query';
+  selectedIndex: string | null;
+  partitionKeyValue: string;
+  sortKeyValue: string;
+  sortKeyOperator: string;
 }
 
 export const TableTab: React.FC<TableTabProps> = ({ 
@@ -42,13 +47,22 @@ export const TableTab: React.FC<TableTabProps> = ({
   // Add state for sample item properties
   const [sampleItemProperties, setSampleItemProperties] = useState<string[]>([]);
   const [loadingProperties, setLoadingProperties] = useState(false);
+  
+  // New state for query functionality
+  const [operationType, setOperationType] = useState<'scan' | 'query'>('scan');
+  const [tableKeySchema, setTableKeySchema] = useState<KeySchemaInfo | null>(null);
+  const [loadingKeySchema, setLoadingKeySchema] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState<string | null>(null);
+  const [partitionKeyValue, setPartitionKeyValue] = useState<string>('');
+  const [sortKeyValue, setSortKeyValue] = useState<string>('');
+  const [sortKeyOperator, setSortKeyOperator] = useState<string>('=');
 
   // Create DynamoDB service using localStorage values instead of env vars
   const dynamoService: DynamoDBService = new AWSDynamoDBService({
     region: 'ap-southeast-2',
     credentials: {
-      accessKeyId: localStorage.getItem('DDBV_KEY_ID') || '',
-      secretAccessKey: localStorage.getItem('DDBV_ACC_KEY') || '',
+      accessKeyId: localStorage.getItem('DDBV_KEY_ID') ?? '',
+      secretAccessKey: localStorage.getItem('DDBV_ACC_KEY') ?? '',
     }
   });
 
@@ -60,19 +74,38 @@ export const TableTab: React.FC<TableTabProps> = ({
   useEffect(() => {
     const savedState = localStorage.getItem(`tab-${tabId}`);
     if (savedState) {
-      const state: TabState = JSON.parse(savedState);
-      if (state.tableName) {
-        onTableNameChange(state.tableName);
-      }
-      // Only load filters from local storage if no initialFilters were provided
-      if (state.filters && initialFilters.length === 0) {
-        setFilters(state.filters);
-      }
-      if (state.columnWidths) {
-        setColumnWidths(state.columnWidths);
-      }
-      if (state.itemsPerPage) {
-        setItemsPerPage(state.itemsPerPage);
+      try {
+        const state: TabState = JSON.parse(savedState);
+        if (state.tableName) {
+          onTableNameChange(state.tableName);
+        }
+        // Only load filters from local storage if no initialFilters were provided
+        if (state.filters && initialFilters.length === 0) {
+          setFilters(state.filters);
+        }
+        if (state.columnWidths) {
+          setColumnWidths(state.columnWidths);
+        }
+        if (state.itemsPerPage) {
+          setItemsPerPage(state.itemsPerPage);
+        }
+        if (state.operationType) {
+          setOperationType(state.operationType);
+        }
+        if (state.selectedIndex) {
+          setSelectedIndex(state.selectedIndex);
+        }
+        if (state.partitionKeyValue) {
+          setPartitionKeyValue(state.partitionKeyValue);
+        }
+        if (state.sortKeyValue) {
+          setSortKeyValue(state.sortKeyValue);
+        }
+        if (state.sortKeyOperator) {
+          setSortKeyOperator(state.sortKeyOperator);
+        }
+      } catch (error) {
+        console.error('Error loading saved tab state:', error);
       }
     }
   }, [tabId, initialFilters.length]);
@@ -82,10 +115,15 @@ export const TableTab: React.FC<TableTabProps> = ({
       tableName,
       filters,
       columnWidths,
-      itemsPerPage
+      itemsPerPage,
+      operationType,
+      selectedIndex,
+      partitionKeyValue,
+      sortKeyValue,
+      sortKeyOperator
     };
     localStorage.setItem(`tab-${tabId}`, JSON.stringify(state));
-  }, [tabId, tableName, filters, columnWidths, itemsPerPage]);
+  }, [tabId, tableName, filters, columnWidths, itemsPerPage, operationType, selectedIndex, partitionKeyValue, sortKeyValue, sortKeyOperator]);
 
   useEffect(() => {
     // Only fetch tables if we have settings
@@ -98,9 +136,11 @@ export const TableTab: React.FC<TableTabProps> = ({
     // Fetch a sample item when the table changes
     if (tableName && hasSettings) {
       fetchSampleItem();
+      fetchTableKeySchema();
     } else {
       // Reset properties if no table is selected
       setSampleItemProperties([]);
+      setTableKeySchema(null);
     }
   }, [tableName, hasSettings]);
 
@@ -123,6 +163,21 @@ export const TableTab: React.FC<TableTabProps> = ({
       setSampleItemProperties([]);
     } finally {
       setLoadingProperties(false);
+    }
+  };
+
+  const fetchTableKeySchema = async () => {
+    if (!tableName) return;
+    
+    setLoadingKeySchema(true);
+    try {
+      const keySchema = await dynamoService.getTableKeySchema(tableName);
+      setTableKeySchema(keySchema);
+    } catch (error) {
+      console.error('Error fetching table key schema:', error);
+      setTableKeySchema(null);
+    } finally {
+      setLoadingKeySchema(false);
     }
   };
 
@@ -152,10 +207,48 @@ export const TableTab: React.FC<TableTabProps> = ({
 
     setLoading(true);
     try {
-      const results = await dynamoService.queryTable(tableName, filters, {
-        limit: itemsPerPage,
-        startKey
-      });
+      let results;
+      
+      if (operationType === 'scan') {
+        // Execute a scan operation
+        results = await dynamoService.scanTable(tableName, filters, {
+          limit: itemsPerPage,
+          startKey
+        });
+      } else {
+        // Execute a query operation
+        if (!selectedIndex || !partitionKeyValue) {
+          throw new Error('Partition key is required for query operations');
+        }
+        
+        const actualIndexName = selectedIndex === 'Primary Key' ? null : selectedIndex;
+        
+        // Get partition key name and sort key name from selected index
+        let partitionKeyName = tableKeySchema?.keySchema.partitionKey ?? '';
+        let sortKeyName: string | undefined;
+        
+        if (actualIndexName && tableKeySchema?.indexes?.[actualIndexName]) {
+          partitionKeyName = tableKeySchema.indexes[actualIndexName].partitionKey ?? '';
+          sortKeyName = tableKeySchema.indexes[actualIndexName].sortKey;
+        } else {
+          sortKeyName = tableKeySchema?.keySchema.sortKey;
+        }
+        
+        results = await dynamoService.queryTable(
+          tableName,
+          actualIndexName,
+          { name: partitionKeyName, value: partitionKeyValue },
+          sortKeyName && sortKeyValue ? 
+            { name: sortKeyName, value: sortKeyValue, operator: sortKeyOperator } : 
+            null,
+          filters,
+          {
+            limit: itemsPerPage,
+            startKey
+          }
+        );
+      }
+      
       setItems(results.items);
       setLastEvaluatedKey(results.lastEvaluatedKey);
       
@@ -164,7 +257,7 @@ export const TableTab: React.FC<TableTabProps> = ({
         setCurrentPageIndex(0);
       }
     } catch (error) {
-      console.error('Error querying DynamoDB:', error);
+      console.error('Error executing DynamoDB operation:', error);
     } finally {
       setLoading(false);
     }
@@ -219,6 +312,25 @@ export const TableTab: React.FC<TableTabProps> = ({
 
     openNewTab(selectedTableName, [idFilter]);
   };
+  
+  const handleOperationTypeChange = (type: 'scan' | 'query') => {
+    setOperationType(type);
+    // Reset pagination when changing operation type
+    setLastEvaluatedKey(undefined);
+    setPageHistory([]);
+    setCurrentPageIndex(-1);
+  };
+  
+  const handleTableNameChange = (name: string) => {
+    onTableNameChange(name);
+    // Reset the lastEvaluatedKey and query parameters when changing tables
+    setLastEvaluatedKey(undefined);
+    setPageHistory([]);
+    setCurrentPageIndex(-1);
+    setSelectedIndex(null);
+    setPartitionKeyValue('');
+    setSortKeyValue('');
+  };
 
   return (
     <div>
@@ -230,13 +342,7 @@ export const TableTab: React.FC<TableTabProps> = ({
         tableName={tableName}
         tables={tables}
         loadingTables={loadingTables}
-        onTableNameChange={(name) => {
-          onTableNameChange(name);
-          // Reset the lastEvaluatedKey when changing tables
-          setLastEvaluatedKey(undefined);
-          setPageHistory([]);
-          setCurrentPageIndex(-1);
-        }}
+        onTableNameChange={handleTableNameChange}
         itemsPerPage={itemsPerPage}
         onItemsPerPageChange={handleItemsPerPageChange}
         hasNextPage={!!lastEvaluatedKey}
@@ -245,6 +351,19 @@ export const TableTab: React.FC<TableTabProps> = ({
         onPreviousPage={handlePreviousPage}
         sampleItemProperties={sampleItemProperties}
         loadingProperties={loadingProperties}
+        // Pass query related props
+        operationType={operationType}
+        setOperationType={handleOperationTypeChange}
+        tableKeySchema={tableKeySchema}
+        loadingKeySchema={loadingKeySchema}
+        selectedIndex={selectedIndex}
+        setSelectedIndex={setSelectedIndex}
+        partitionKeyValue={partitionKeyValue}
+        setPartitionKeyValue={setPartitionKeyValue}
+        sortKeyValue={sortKeyValue}
+        setSortKeyValue={setSortKeyValue}
+        sortKeyOperator={sortKeyOperator}
+        setSortKeyOperator={setSortKeyOperator}
       />
       <TableView
         items={items}
