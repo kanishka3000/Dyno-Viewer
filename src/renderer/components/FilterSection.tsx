@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { KeySchemaInfo } from '../services/DynamoDBService';
+import { ScanFilters } from './ScanFilters';
+import { QueryFilters } from './QueryFilters';
 
-interface FilterExpression {
+export interface FilterExpression {
   id: string;
   attributeName: string;
   operator: string;
   value: string;
 }
 
-interface FilterSectionProps {
+export interface FilterSectionProps {
   filters: FilterExpression[];
   setFilters: (filters: FilterExpression[]) => void;
   onExecuteQuery: () => void;
@@ -25,7 +27,7 @@ interface FilterSectionProps {
   onPreviousPage: () => void;
   sampleItemProperties?: string[];
   loadingProperties?: boolean;
-  // New props for query feature
+  // Query props
   operationType: 'scan' | 'query';
   setOperationType: (type: 'scan' | 'query') => void;
   tableKeySchema: KeySchemaInfo | null;
@@ -71,51 +73,7 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
   sortKeyOperator,
   setSortKeyOperator
 }) => {
-  const [availableIndexes, setAvailableIndexes] = useState<{name: string; partitionKey: string; sortKey?: string}[]>([]);
-  const [partitionKeyName, setPartitionKeyName] = useState<string>('');
-  const [sortKeyName, setSortKeyName] = useState<string | undefined>(undefined);
-  
-  // Update available indexes when table key schema changes
-  useEffect(() => {
-    if (tableKeySchema) {
-      // Add the base table as an option
-      const options = [{
-        name: 'Primary Key',
-        partitionKey: tableKeySchema.keySchema.partitionKey,
-        sortKey: tableKeySchema.keySchema.sortKey
-      }];
-      
-      // Add all indexes
-      if (tableKeySchema.indexes) {
-        Object.entries(tableKeySchema.indexes).forEach(([indexName, keySchema]) => {
-          options.push({
-            name: indexName,
-            partitionKey: keySchema.partitionKey,
-            sortKey: keySchema.sortKey
-          });
-        });
-      }
-      
-      setAvailableIndexes(options);
-      
-      // Set default selected index to primary key
-      if (!selectedIndex) {
-        setSelectedIndex('Primary Key');
-      }
-    }
-  }, [tableKeySchema, setSelectedIndex, selectedIndex]);
-  
-  // Update partition/sort key names when selected index changes
-  useEffect(() => {
-    if (!selectedIndex || !availableIndexes.length) return;
-    
-    const selectedIndexInfo = availableIndexes.find(idx => idx.name === selectedIndex);
-    if (selectedIndexInfo) {
-      setPartitionKeyName(selectedIndexInfo.partitionKey);
-      setSortKeyName(selectedIndexInfo.sortKey);
-    }
-  }, [selectedIndex, availableIndexes]);
-
+  // Helper functions for filter management
   const addFilter = () => {
     setFilters([
       ...filters,
@@ -155,14 +113,16 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
   const handleOperationTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setOperationType(e.target.checked ? 'query' : 'scan');
   };
-  
-  // Handle index change
-  const handleIndexChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedIndex(e.target.value === 'Primary Key' ? 'Primary Key' : e.target.value);
+
+  // Extract nested ternary into a function
+  const getButtonLabel = () => {
+    if (loading) return 'Loading...';
+    return operationType === 'scan' ? 'Scan' : 'Query';
   };
 
   return (
     <div className="filter-container">
+      {/* Operation type selection */}
       <div className="operation-selection">
         <label htmlFor="operationType">Operation Type:</label>
         <div className="toggle-switch-container">
@@ -183,6 +143,7 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
         </div>
       </div>
       
+      {/* Table selection */}
       {loadingTables ? (
         <span className="loading-text">Loading tables...</span>
       ) : (
@@ -198,177 +159,43 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
         </select>
       )}
 
-      {/* Query specific controls */}
-      {operationType === 'query' && tableName && (
-        <div className="query-controls">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h4 style={{ margin: 0 }}>Query Parameters</h4>
-            <button
-              onClick={clearQueryFilters}
-              className="secondary clear-filters-btn"
-              disabled={loading || (!partitionKeyValue && !sortKeyValue && filters.length === 0)}
-            >
-              Clear Filters
-            </button>
-          </div>
-          
-          {loadingKeySchema ? (
-            <div className="loading-text">Loading table structure...</div>
-          ) : (
-            <>
-              <div className="index-selection">
-                <label htmlFor="indexSelect">Select a table or index:</label>
-                <select
-                  id="indexSelect"
-                  value={selectedIndex || ''}
-                  onChange={handleIndexChange}
-                  disabled={availableIndexes.length === 0}
-                >
-                  {availableIndexes.length === 0 ? (
-                    <option value="">No indexes available</option>
-                  ) : (
-                    availableIndexes.map(idx => (
-                      <option key={idx.name} value={idx.name}>
-                        {idx.name === 'Primary Key' ? 'Table: ' + tableName : 'Index: ' + idx.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-            
-              {/* Partition key input */}
-              {partitionKeyName && (
-                <div className="key-input">
-                  <label htmlFor="partitionKey">Partition key: {partitionKeyName}</label>
-                  <input
-                    id="partitionKey"
-                    type="text"
-                    placeholder={`Enter ${partitionKeyName} value`}
-                    value={partitionKeyValue}
-                    onChange={(e) => setPartitionKeyValue(e.target.value)}
-                  />
-                </div>
-              )}
-              
-              {/* Sort key input */}
-              {sortKeyName && (
-                <div className="key-input sort-key">
-                  <label htmlFor="sortKey">Sort key: {sortKeyName}</label>
-                  <div className="sort-key-controls">
-                    <select
-                      value={sortKeyOperator}
-                      onChange={(e) => setSortKeyOperator(e.target.value)}
-                      className="sort-key-operator"
-                    >
-                      <option value="=">=</option>
-                      <option value="<">&lt;</option>
-                      <option value="<=">&lt;=</option>
-                      <option value=">">&gt;</option>
-                      <option value=">=">&gt;=</option>
-                      <option value="begins_with">begins_with</option>
-                    </select>
-                    <input
-                      id="sortKey"
-                      type="text"
-                      placeholder={`Enter ${sortKeyName} value`}
-                      value={sortKeyValue}
-                      onChange={(e) => setSortKeyValue(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      {/* Render scan or query filters based on operation type */}
+      {tableName && operationType === 'scan' ? (
+        <ScanFilters
+          filters={filters}
+          updateFilter={updateFilter}
+          removeFilter={removeFilter}
+          addFilter={addFilter}
+          clearFilters={clearScanFilters}
+          sampleItemProperties={sampleItemProperties}
+          loadingProperties={loadingProperties}
+          loading={loading}
+        />
+      ) : tableName ? (
+        <QueryFilters
+          tableKeySchema={tableKeySchema}
+          loadingKeySchema={loadingKeySchema}
+          selectedIndex={selectedIndex}
+          setSelectedIndex={setSelectedIndex}
+          partitionKeyValue={partitionKeyValue}
+          setPartitionKeyValue={setPartitionKeyValue}
+          sortKeyValue={sortKeyValue}
+          setSortKeyValue={setSortKeyValue}
+          sortKeyOperator={sortKeyOperator}
+          setSortKeyOperator={setSortKeyOperator}
+          filters={filters}
+          updateFilter={updateFilter}
+          removeFilter={removeFilter}
+          addFilter={addFilter}
+          clearFilters={clearQueryFilters}
+          sampleItemProperties={sampleItemProperties}
+          loadingProperties={loadingProperties}
+          loading={loading}
+        />
+      ) : null}
 
-      {/* Additional filters - only shown for scan or as additional query filters */}
-      <div className="filters-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h4 style={{ margin: 0 }}>
-            {operationType === 'scan' ? 'Filters' : 'Additional Filters'}
-            {operationType === 'query' && (
-              <span className="filter-hint">(applied after the key conditions)</span>
-            )}
-          </h4>
-        </div>
-        {filters.map((filter) => (
-          <div key={filter.id} className="filter-row">
-            <div className="attribute-field">
-              {loadingProperties ? (
-                <select disabled>
-                  <option>Loading properties...</option>
-                </select>
-              ) : (
-                <div className="combobox-wrapper">
-                  <input
-                    list={`properties-list-${filter.id}`}
-                    type="text"
-                    placeholder="Attribute name"
-                    value={filter.attributeName}
-                    onChange={(e) => updateFilter(filter.id, { attributeName: e.target.value })}
-                  />
-                  <datalist id={`properties-list-${filter.id}`}>
-                    {sampleItemProperties.map((prop) => (
-                      <option key={prop} value={prop} />
-                    ))}
-                  </datalist>
-                </div>
-              )}
-            </div>
-
-            <select
-              value={filter.operator}
-              onChange={(e) => updateFilter(filter.id, { operator: e.target.value })}
-            >
-              <option value="=">=</option>
-              <option value="<">&lt;</option>
-              <option value="<=">&lt;=</option>
-              <option value=">">&gt;</option>
-              <option value=">=">&gt;=</option>
-              <option value="begins_with">begins_with</option>
-            </select>
-            <input
-              type="text"
-              placeholder="Value"
-              value={filter.value}
-              onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-            />
-            <button
-              onClick={() => removeFilter(filter.id)}
-              className="secondary"
-              aria-label="Remove filter"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-      </div>
-
+      {/* Common pagination and action controls */}
       <div className="actions-row">
-        <button
-          onClick={addFilter}
-          className="secondary"
-        >
-          Add Filter
-        </button>
-        {operationType === 'scan' ? (
-          <button
-            onClick={clearScanFilters}
-            className="secondary"
-            disabled={loading || filters.length === 0}
-          >
-            Clear Filters
-          </button>
-        ) : (
-          <button
-            onClick={clearQueryFilters}
-            className="secondary"
-            disabled={loading || (!partitionKeyValue && !sortKeyValue && filters.length === 0)}
-          >
-            Clear Filters
-          </button>
-        )}
         <div className="items-per-page">
           <label htmlFor="itemsPerPage">Items per page:</label>
           <select
@@ -394,7 +221,7 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
             disabled={loading || !tableName || (operationType === 'query' && !partitionKeyValue)}
             className="primary"
           >
-            {loading ? 'Loading...' : operationType === 'scan' ? 'Scan' : 'Query'}
+            {getButtonLabel()}
           </button>
           <button
             onClick={onNextPage}
@@ -408,5 +235,3 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
     </div>
   );
 };
-
-export type { FilterExpression, FilterSectionProps };
