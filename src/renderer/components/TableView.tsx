@@ -1,6 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FilterExpression } from './FilterSection';
-
 interface TableViewProps {
   items: any[];
   columnWidths: { [key: string]: number };
