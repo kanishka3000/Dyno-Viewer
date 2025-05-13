@@ -55,18 +55,29 @@ export const TableView: React.FC<TableViewProps> = ({
     const contextMenuRect = submenuRef.current.parentElement?.getBoundingClientRect();
     if (!contextMenuRect) return { left: '100%', right: 'auto' };
 
-    // Check if there's enough space on the right
+    // Check if there's enough space on either side
     const viewportWidth = window.innerWidth;
     const submenuWidth = 200; // Estimated width, can be adjusted
+    const spaceOnRight = viewportWidth - contextMenuRect.right;
+    const spaceOnLeft = contextMenuRect.left;
     
-    // If there's enough space on the right
-    if (contextMenuRect.right + submenuWidth < viewportWidth - 20) {
+    // First try right side (preferred)
+    if (spaceOnRight >= submenuWidth + 10) { // Add 10px buffer
       return { left: '100%', right: 'auto' };
-    } 
-    // Otherwise position to the left
-    else {
+    }
+    // Then try left side
+    if (spaceOnLeft >= submenuWidth + 10) {
       return { left: 'auto', right: '100%' };
     }
+    
+    // If neither side has enough space, choose the side with more space
+    const width = Math.max(150, (spaceOnRight >= spaceOnLeft ? spaceOnRight : spaceOnLeft) - 10);
+    return { 
+      left: spaceOnRight >= spaceOnLeft ? '100%' : 'auto',
+      right: spaceOnRight >= spaceOnLeft ? 'auto' : '100%',
+      width: `${width}px`,
+      maxWidth: `${width}px`
+    };
   };
 
   useEffect(() => {
@@ -172,10 +183,35 @@ export const TableView: React.FC<TableViewProps> = ({
 
   const handleCellContextMenu = (e: React.MouseEvent<HTMLElement>, column: string, value: string) => {
     e.preventDefault();
+    
+    // Get viewport dimensions
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Approximate menu dimensions (you might want to measure actual dimensions)
+    const menuWidth = 200;
+    const menuHeight = 100;
+    
+    // Calculate available space
+    const spaceOnRight = viewportWidth - e.clientX;
+    const spaceOnBottom = viewportHeight - e.clientY;
+    
+    // Adjust x position if not enough space on right
+    let x = e.clientX;
+    if (spaceOnRight < menuWidth + 10) { // Add 10px buffer
+      x = e.clientX - menuWidth;
+    }
+    
+    // Adjust y position if not enough space at bottom
+    let y = e.clientY;
+    if (spaceOnBottom < menuHeight + 10) { // Add 10px buffer
+      y = e.clientY - menuHeight;
+    }
+    
     setContextMenu({
       visible: true,
-      x: e.clientX,
-      y: e.clientY,
+      x,
+      y,
       column,
       value,
       showTablesSubmenu: false
@@ -185,6 +221,13 @@ export const TableView: React.FC<TableViewProps> = ({
   const handleFilterClick = () => {
     if (contextMenu && addFilter) {
       addFilter(contextMenu.column, contextMenu.value);
+      setContextMenu(null);
+    }
+  };
+
+  const handleCopyClick = () => {
+    if (contextMenu) {
+      navigator.clipboard.writeText(contextMenu.value);
       setContextMenu(null);
     }
   };
@@ -286,6 +329,9 @@ export const TableView: React.FC<TableViewProps> = ({
         >
           <button onClick={handleFilterClick}>
             Filter: {contextMenu.column} = {contextMenu.value}
+          </button>
+          <button onClick={handleCopyClick}>
+            Copy
           </button>
           {findById && (
             <button 
